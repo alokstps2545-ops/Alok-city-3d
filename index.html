@@ -1,0 +1,268 @@
+
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>ALOK CITY 3D</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;overflow:hidden;background:#000;font-family:Arial;touch-action:none;color:white}
+canvas{display:block}
+#menu{position:fixed;inset:0;z-index:10;background:linear-gradient(135deg,#06172d,#123b58,#050b18);display:flex;align-items:center;justify-content:center;text-align:center}
+.panel{background:#101e30eF;padding:30px;border:1px solid #3ba9e9;border-radius:20px;width:90%;max-width:400px}
+h1{font-size:40px;color:#31c8ff;text-shadow:0 0 15px #009dff}
+button{background:#087fbd;border:0;color:white;padding:13px 20px;border-radius:10px;font-size:16px;margin:5px}
+#hud{position:fixed;top:10px;left:10px;z-index:3;display:none;text-shadow:1px 1px 4px black}
+#joystick{position:fixed;bottom:25px;left:25px;width:125px;height:125px;border-radius:50%;background:#ffffff30;border:2px solid #ffffff90;display:none;z-index:4}
+#stick{position:absolute;width:48px;height:48px;left:36px;top:36px;border-radius:50%;background:#39bfff;border:2px solid white}
+#cameraHelp{position:fixed;right:15px;bottom:25px;background:#0008;padding:12px;border-radius:12px;display:none;z-index:3;font-size:12px}
+#actions{position:fixed;right:15px;bottom:100px;display:none;z-index:4}
+</style>
+</head>
+<body>
+
+<div id="menu">
+ <div class="panel">
+  <h1>ALOK CITY</h1>
+  <h3>OPEN WORLD 3D</h3>
+  <p>Explore a massive 3D city</p>
+  <button onclick="startGame()">START GAME</button>
+  <button onclick="showSettings()">SETTINGS</button>
+  <p id="msg">Welcome to ALOK CITY</p>
+ </div>
+</div>
+
+<div id="hud">🏙️ ALOK CITY | 3D WORLD</div>
+<div id="joystick"><div id="stick"></div></div>
+<div id="cameraHelp">दाईं तरफ स्क्रीन घुमाओ<br>कैमरा 360° घूमेगा</div>
+<div id="actions"><button onclick="jump()">JUMP</button></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+let scene,camera,renderer,player;
+let started=false;
+let yaw=0,pitch=.25;
+let moveX=0,moveY=0;
+let joyActive=false;
+let lastX=0,lastY=0;
+
+function showSettings(){
+ document.getElementById("msg").innerText="3D Camera: ON | Joystick: ON";
+}
+
+function startGame(){
+ if(!window.THREE){
+  alert("3D library load nahi hui. Internet check karo.");
+  return;
+ }
+ document.getElementById("menu").style.display="none";
+ document.getElementById("hud").style.display="block";
+ document.getElementById("joystick").style.display="block";
+ document.getElementById("cameraHelp").style.display="block";
+ document.getElementById("actions").style.display="block";
+ if(!started){init();started=true;}
+}
+
+function box(x,y,z,w,h,d,color){
+ let m=new THREE.Mesh(
+  new THREE.BoxGeometry(w,h,d),
+  new THREE.MeshStandardMaterial({color:color})
+ );
+ m.position.set(x,y,z);
+ scene.add(m);
+ return m;
+}
+
+function init(){
+ scene=new THREE.Scene();
+ scene.background=new THREE.Color(0x87ceeb);
+ scene.fog=new THREE.Fog(0x87ceeb,100,450);
+
+ camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,1000);
+ renderer=new THREE.WebGLRenderer({antialias:true});
+ renderer.setSize(innerWidth,innerHeight);
+ renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
+ document.body.appendChild(renderer.domElement);
+
+ scene.add(new THREE.HemisphereLight(0xffffff,0x536477,2));
+ let sun=new THREE.DirectionalLight(0xffffff,2);
+ sun.position.set(100,150,80);
+ scene.add(sun);
+
+ let ground=new THREE.Mesh(
+  new THREE.PlaneGeometry(700,700),
+  new THREE.MeshStandardMaterial({color:0x397d43})
+ );
+ ground.rotation.x=-Math.PI/2;
+ scene.add(ground);
+
+ // City roads
+ for(let i=-300;i<=300;i+=60){
+  box(i,.08,0,16,.15,700,0x292d32);
+  box(0,.08,i,700,.15,16,0x292d32);
+  for(let j=-300;j<300;j+=20){
+   box(i,.17,j,0.4,.03,8,0xffffff);
+   box(j,.17,i,8,.03,.4,0xffffff);
+  }
+ }
+
+ // Large city buildings
+ for(let x=-270;x<=270;x+=60){
+  for(let z=-270;z<=270;z+=60){
+   if(Math.abs(x)<30||Math.abs(z)<30)continue;
+   let h=15+Math.random()*65;
+   let colors=[0x43566c,0x697d91,0x263d58,0x5a6070,0x344e65];
+   box(x,h/2,z,25,h,25,colors[Math.floor(Math.random()*colors.length)]);
+   for(let y=5;y<h;y+=7){
+    for(let s of [-1,1]){
+     box(x+s*12.6,y,z,0.2,2.5,2,0x7ddfff);
+     box(x,y,z+s*12.6,2,2.5,.2,0x7ddfff);
+    }
+   }
+  }
+ }
+
+ // Helipad
+ let pad=new THREE.Mesh(
+  new THREE.CircleGeometry(18,40),
+  new THREE.MeshStandardMaterial({color:0x333333})
+ );
+ pad.rotation.x=-Math.PI/2;
+ pad.position.set(95,.2,95);
+ scene.add(pad);
+ box(95,.3,95,12,.15,12,0xffffff);
+
+ // Helicopter display
+ let heli=new THREE.Group();
+ let hb=new THREE.Mesh(
+  new THREE.SphereGeometry(2.5,20,16),
+  new THREE.MeshStandardMaterial({color:0x263b2c})
+ );
+ hb.scale.set(1.8,.8,1);
+ heli.add(hb);
+ let rotor=new THREE.Mesh(
+  new THREE.BoxGeometry(14,.12,.5),
+  new THREE.MeshStandardMaterial({color:0x111111})
+ );
+ rotor.position.y=2.5;
+ heli.add(rotor);
+ heli.position.set(95,4,95);
+ scene.add(heli);
+
+ // Player
+ player=new THREE.Group();
+ let body=new THREE.Mesh(
+  new THREE.CapsuleGeometry(.7,1.3,4,10),
+  new THREE.MeshStandardMaterial({color:0x087bff})
+ );
+ body.position.y=1.4;
+ player.add(body);
+ let head=new THREE.Mesh(
+  new THREE.SphereGeometry(.55,16,16),
+  new THREE.MeshStandardMaterial({color:0xffc99c})
+ );
+ head.position.y=2.6;
+ player.add(head);
+ player.position.set(0,0,0);
+ scene.add(player);
+
+ animate();
+}
+
+function jump(){
+ if(player)player.position.y=2;
+ setTimeout(()=>{if(player)player.position.y=0},400);
+}
+
+// Joystick
+let joy=document.getElementById("joystick");
+let stick=document.getElementById("stick");
+joy.addEventListener("pointerdown",e=>{
+ joyActive=true;
+ joy.setPointerCapture(e.pointerId);
+ joystickMove(e);
+});
+joy.addEventListener("pointermove",e=>{
+ if(joyActive)joystickMove(e);
+});
+function joystickMove(e){
+ let r=joy.getBoundingClientRect();
+ let dx=e.clientX-(r.left+r.width/2);
+ let dy=e.clientY-(r.top+r.height/2);
+ let len=Math.sqrt(dx*dx+dy*dy);
+ if(len>40){dx=dx/len*40;dy=dy/len*40;}
+ stick.style.left=(36+dx)+"px";
+ stick.style.top=(36+dy)+"px";
+ moveX=dx/40;
+ moveY=dy/40;
+}
+function joyEnd(){
+ joyActive=false;moveX=0;moveY=0;
+ stick.style.left="36px";stick.style.top="36px";
+}
+joy.addEventListener("pointerup",joyEnd);
+joy.addEventListener("pointercancel",joyEnd);
+
+// Camera rotation with finger on right side
+document.addEventListener("pointerdown",e=>{
+ if(e.clientX>innerWidth*.48){
+  lastX=e.clientX;
+  lastY=e.clientY;
+ }
+});
+document.addEventListener("pointermove",e=>{
+ if(e.buttons&&e.clientX>innerWidth*.48){
+  let dx=e.clientX-lastX;
+  let dy=e.clientY-lastY;
+  yaw-=dx*.008;
+  pitch=Math.max(-.3,Math.min(1.1,pitch+dy*.005));
+  lastX=e.clientX;
+  lastY=e.clientY;
+ }
+});
+
+// Keyboard
+let keys={};
+document.addEventListener("keydown",e=>keys[e.key.toLowerCase()]=true);
+document.addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
+
+function animate(){
+ requestAnimationFrame(animate);
+ if(!started)return;
+
+ let forward=moveY;
+ let side=moveX;
+ if(keys.w||keys.arrowup)forward=-1;
+ if(keys.s||keys.arrowdown)forward=1;
+ if(keys.a||keys.arrowleft)side=-1;
+ if(keys.d||keys.arrowright)side=1;
+
+ let speed=.28;
+ player.position.x+=(-Math.sin(yaw)*forward+Math.cos(yaw)*side)*speed;
+ player.position.z+=(-Math.cos(yaw)*forward-Math.sin(yaw)*side)*speed;
+
+ player.rotation.y=yaw;
+
+ let distance=13;
+ let target=new THREE.Vector3(
+  player.position.x+Math.sin(yaw)*distance*Math.cos(pitch),
+  player.position.y+4+Math.sin(pitch)*distance,
+  player.position.z+Math.cos(yaw)*distance*Math.cos(pitch)
+ );
+ camera.position.lerp(target,.12);
+ camera.lookAt(player.position.x,1.5,player.position.z);
+
+ renderer.render(scene,camera);
+}
+
+window.addEventListener("resize",()=>{
+ if(camera&&renderer){
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+ }
+});
+</script>
+</body>
+</html>
