@@ -1,0 +1,222 @@
+
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ALOK CITY</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;overflow:hidden;background:#07111e;color:white;font-family:Arial}
+#menu{position:fixed;inset:0;z-index:5;background:linear-gradient(#07111ecc,#07111e),linear-gradient(120deg,#123b55,#101525);display:flex;align-items:center;justify-content:center;text-align:center}
+.panel{width:90%;max-width:420px;padding:25px;background:#101e30;border:1px solid #426080;border-radius:18px}
+h1{font-size:42px;color:#35c9ff;margin:10px}
+button{background:#087fbd;color:white;border:0;border-radius:10px;padding:13px 25px;font-size:17px;margin:8px;cursor:pointer}
+#hud{display:none;position:fixed;top:12px;left:12px;z-index:2}
+#controls{display:none;position:fixed;bottom:20px;left:0;right:0;z-index:3;justify-content:space-between;padding:15px}
+.pad{display:grid;grid-template-columns:repeat(3,55px);gap:5px}
+.pad button{margin:0;padding:14px 5px;background:#123b5ccc}
+#look{display:flex;align-items:end}
+#look button{padding:18px}
+#hint{position:fixed;bottom:5px;left:0;right:0;text-align:center;color:#ddd;font-size:12px}
+</style>
+</head>
+<body>
+<div id="menu">
+ <div class="panel">
+  <h1>ALOK CITY</h1>
+  <p>OPEN WORLD 3D CITY</p>
+  <p>Explore • Drive • Discover</p>
+  <button onclick="startGame()">START GAME</button>
+  <button onclick="settings()">SETTINGS</button>
+  <p id="message">Welcome to Alok City</p>
+ </div>
+</div>
+<div id="hud">🏙️ ALOK CITY <span id="position"></span></div>
+<div id="controls">
+ <div class="pad">
+  <span></span><button data-key="w">▲</button><span></span>
+  <button data-key="a">◀</button><button data-key="s">▼</button><button data-key="d">▶</button>
+ </div>
+ <div id="look">
+  <button data-key="q">↶</button>
+  <button data-key="e">↷</button>
+ </div>
+</div>
+<div id="hint">WASD / Arrow keys से चलें • Q और E से दिशा बदलें</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+let scene,camera,renderer,player,started=false;
+let keys={};
+let buildings=[];
+
+function settings(){
+ document.getElementById("message").innerText=
+ "Settings: Mobile controls enabled. Sound: Coming soon.";
+}
+
+function startGame(){
+ document.getElementById("menu").style.display="none";
+ document.getElementById("hud").style.display="block";
+ document.getElementById("controls").style.display="flex";
+ if(!started){init();started=true;}
+}
+
+function init(){
+ scene=new THREE.Scene();
+ scene.background=new THREE.Color(0x87ceeb);
+ scene.fog=new THREE.Fog(0x87ceeb,80,250);
+
+ camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,500);
+ renderer=new THREE.WebGLRenderer({antialias:true});
+ renderer.setSize(innerWidth,innerHeight);
+ renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+ document.body.appendChild(renderer.domElement);
+
+ scene.add(new THREE.HemisphereLight(0xffffff,0x536477,2));
+ let sun=new THREE.DirectionalLight(0xffffff,2);
+ sun.position.set(40,80,30);scene.add(sun);
+
+ const ground=new THREE.Mesh(
+  new THREE.PlaneGeometry(400,400),
+  new THREE.MeshStandardMaterial({color:0x477d48})
+ );
+ ground.rotation.x=-Math.PI/2;scene.add(ground);
+
+ // Roads
+ function road(x,z,w,d){
+  let m=new THREE.Mesh(
+   new THREE.BoxGeometry(w,.12,d),
+   new THREE.MeshStandardMaterial({color:0x292d32})
+  );
+  m.position.set(x,.06,z);scene.add(m);
+ }
+ for(let i=-160;i<=160;i+=40){
+  road(i,0,12,350);
+  road(0,i,350,12);
+ }
+
+ // Buildings
+ for(let x=-140;x<=140;x+=40){
+  for(let z=-140;z<=140;z+=40){
+   if(Math.abs(x)<20||Math.abs(z)<20)continue;
+   let h=12+Math.random()*35;
+   let b=new THREE.Mesh(
+    new THREE.BoxGeometry(17,h,17),
+    new THREE.MeshStandardMaterial({
+     color:new THREE.Color().setHSL(.55+Math.random()*.12,.35,.3+Math.random()*.2)
+    })
+   );
+   b.position.set(x,h/2,z);
+   scene.add(b);
+   buildings.push(b);
+   // Windows
+   for(let y=4;y<h-2;y+=5){
+    for(let side=-1;side<=1;side+=2){
+     let win=new THREE.Mesh(
+      new THREE.BoxGeometry(.12,2,2),
+      new THREE.MeshBasicMaterial({color:0x9ce5ff})
+     );
+     win.position.set(x+side*8.56,y,z);
+     scene.add(win);
+    }
+   }
+  }
+ }
+
+ // Helipad
+ let pad=new THREE.Mesh(
+  new THREE.CircleGeometry(12,40),
+  new THREE.MeshStandardMaterial({color:0x333b44})
+ );
+ pad.rotation.x=-Math.PI/2;pad.position.set(65,.14,65);scene.add(pad);
+ let H=new THREE.Mesh(
+  new THREE.BoxGeometry(8,.2,8),
+  new THREE.MeshBasicMaterial({color:0xffffff})
+ );
+ H.position.set(65,.3,65);scene.add(H);
+
+ // Decorative helicopter
+ let heli=new THREE.Group();
+ let body=new THREE.Mesh(
+  new THREE.SphereGeometry(2,16,12),
+  new THREE.MeshStandardMaterial({color:0x263d35})
+ );
+ body.scale.set(1.8,.8,1);heli.add(body);
+ let blade=new THREE.Mesh(
+  new THREE.BoxGeometry(12,.12,.5),
+  new THREE.MeshStandardMaterial({color:0x222222})
+ );
+ blade.position.y=2;heli.add(blade);
+ heli.position.set(65,4,65);scene.add(heli);
+
+ // Player
+ player=new THREE.Group();
+ let body=new THREE.Mesh(
+  new THREE.CapsuleGeometry(.7,1.3,4,8),
+  new THREE.MeshStandardMaterial({color:0x1679ff})
+ );
+ body.position.y=1.4;player.add(body);
+ let head=new THREE.Mesh(
+  new THREE.SphereGeometry(.55,16,16),
+  new THREE.MeshStandardMaterial({color:0xffc99c})
+ );
+ head.position.y=2.6;player.add(head);
+ player.position.set(0,0,0);
+ scene.add(player);
+
+ camera.position.set(0,8,12);
+ animate();
+}
+
+function animate(){
+ requestAnimationFrame(animate);
+ if(!started)return;
+ let speed=.35;
+ if(keys.w||keys.ArrowUp){
+  player.position.x-=Math.sin(player.rotation.y)*speed;
+  player.position.z-=Math.cos(player.rotation.y)*speed;
+ }
+ if(keys.s||keys.ArrowDown){
+  player.position.x+=Math.sin(player.rotation.y)*speed;
+  player.position.z+=Math.cos(player.rotation.y)*speed;
+ }
+ if(keys.a||keys.ArrowLeft)player.rotation.y+=.045;
+ if(keys.d||keys.ArrowRight)player.rotation.y-=.045;
+ if(keys.q)player.rotation.y+=.04;
+ if(keys.e)player.rotation.y-=.04;
+
+ let target=new THREE.Vector3(
+  player.position.x+Math.sin(player.rotation.y)*10,
+  7,
+  player.position.z+Math.cos(player.rotation.y)*10
+ );
+ camera.position.lerp(target,.08);
+ camera.lookAt(player.position.x,1.5,player.position.z);
+ document.getElementById("position").innerText=
+ " | X: "+Math.round(player.position.x)+" Z: "+Math.round(player.position.z);
+ renderer.render(scene,camera);
+}
+
+document.addEventListener("keydown",e=>keys[e.key.toLowerCase()]=true);
+document.addEventListener("keyup",e=>keys[e.key.toLowerCase()]=false);
+
+document.querySelectorAll("[data-key]").forEach(btn=>{
+ let k=btn.dataset.key;
+ btn.addEventListener("pointerdown",e=>{e.preventDefault();keys[k]=true;});
+ btn.addEventListener("pointerup",()=>keys[k]=false);
+ btn.addEventListener("pointerleave",()=>keys[k]=false);
+ btn.addEventListener("pointercancel",()=>keys[k]=false);
+});
+
+window.addEventListener("resize",()=>{
+ if(camera&&renderer){
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+ }
+});
+</script>
+</body>
+</html>
